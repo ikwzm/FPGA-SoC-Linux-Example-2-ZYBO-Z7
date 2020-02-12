@@ -1,0 +1,63 @@
+/dts-v1/;/plugin/;
+/ {
+	fragment@0 {
+		target-path = "/amba/fpga-region0";
+		__overlay__ {
+			firmware-name = "loopback-dma.bin";
+		};
+	};
+	fragment@1 {
+		target-path = "/amba";
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		__overlay__ {
+			#address-cells = <0x1>;
+			#size-cells = <0x1>;
+			fclk0 {
+				compatible    = "ikwzm,fclkcfg-0.10.a";
+				clocks        = <&clkc 15>;
+				insert-rate   = "100000000";
+				insert-enable = <1>;
+			};
+			loopback_dma: axidma@40400000 {
+			        compatible = "generic-uio";
+			        #dma-cells = <1>;
+			        reg = < 0x40400000 0x10000 >;
+			        clocks = <&clkc 15>, <&clkc 15>, <&clkc 15>, <&clkc 15>; // fclk0 from clock controller
+			        clock-names = "s_axi_lite_aclk", "m_axi_mm2s_aclk", "m_axi_s2mm_aclk", "m_axi_sg_aclk";
+			        xlnx,include-sg;
+
+			        loopback_dma_mm2s_chan: dma-channel@40400000 {
+					compatible = "xlnx,axi-dma-mm2s-channel";
+					interrupt-parent = <&intc>;
+					interrupts = <0 31 4>; 
+					xlnx,datawidth = <0x20>;        
+					xlnx,sg-length-width = <14>;    
+					xlnx,device-id = <0x1>;     
+			        };
+
+			        loopback_dma_s2mm_chan: dma-channel@40400030 {
+					compatible = "xlnx,axi-dma-s2mm-channel";
+					interrupt-parent = <&intc>;
+					interrupts = <0 32 4>; 
+					xlnx,datawidth = <0x20>;       
+					xlnx,sg-length-width = <14>;    
+					xlnx,device-id = <0x1>;     
+				};
+			};
+			udmabuf-tx {
+				compatible  = "ikwzm,udmabuf-0.10.a";
+				device-name = "udmabuf-tx";
+				size = <0x00100000>;
+				sync-direction = <1>;
+	                };
+
+			udmabuf-rx {
+				compatible  = "ikwzm,udmabuf-0.10.a";
+				device-name = "udmabuf-rx";
+				size = <0x00100000>;
+				sync-direction = <2>;
+			};
+                };
+	};
+};
