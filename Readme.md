@@ -29,30 +29,34 @@ shell$ cd FPGA-SoC-Linux-Example-2-ZYBO-Z7
 shell# rake install
 cp loopback-dma.bin /lib/firmware/loopback-dma.bin
 dtbocfg.rb --install loopback-dma --dts loopback-dma.dts
-<stdin>:30.57-37.14: Warning (unit_address_vs_reg): /fragment@1/__overlay__/axidma@40400000/dma-channel@40400000: node has a unit name, but no reg property
-<stdin>:39.57-46.7: Warning (unit_address_vs_reg): /fragment@1/__overlay__/axidma@40400000/dma-channel@40400030: node has a unit name, but no reg property
+<stdin>:22.17-47.6: Warning (unit_address_vs_reg): /fragment@1/__overlay__/loopback_dma: node has a reg or ranges property, but no unit name
+<stdin>:30.57-37.14: Warning (unit_address_vs_reg): /fragment@1/__overlay__/loopback_dma/dma-channel@40400000: node has a unit name, but no reg property
+<stdin>:39.57-46.7: Warning (unit_address_vs_reg): /fragment@1/__overlay__/loopback_dma/dma-channel@40400030: node has a unit name, but no reg property
 <stdin>:9.13-62.4: Warning (avoid_unnecessary_addr_size): /fragment@1: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
-[  987.295033] fpga_manager fpga0: writing loopback-dma.bin to Xilinx Zynq FPGA Manager
-[  987.369880] OF: overlay: WARNING: memory leak will occur if overlay removed, property: /amba/fpga-region0/firmware-name
-[  987.383069] fclkcfg amba:fclk0: driver installed.
-[  987.387790] fclkcfg amba:fclk0: device name    : fclk0
-[  987.395130] fclkcfg amba:fclk0: clock  name    : fclk0
-[  987.400272] fclkcfg amba:fclk0: clock  rate    : 99999999
-[  987.407654] fclkcfg amba:fclk0: clock  enabled : 1
-[  987.428443] udmabuf udmabuf-tx: driver version = 1.4.2
-[  987.433768] udmabuf udmabuf-tx: major number   = 244
-[  987.438748] udmabuf udmabuf-tx: minor number   = 0
-[  987.444227] udmabuf udmabuf-tx: phys address   = 0x30100000
-[  987.449799] udmabuf udmabuf-tx: buffer size    = 1048576
-[  987.455297] udmabuf udmabuf-tx: dma coherent   = 0
-[  987.460085] udmabuf amba:udmabuf-tx: driver installed.
-[  987.477466] udmabuf udmabuf-rx: driver version = 1.4.2
-[  987.482686] udmabuf udmabuf-rx: major number   = 244
-[  987.487642] udmabuf udmabuf-rx: minor number   = 1
-[  987.492535] udmabuf udmabuf-rx: phys address   = 0x30200000
-[  987.498102] udmabuf udmabuf-rx: buffer size    = 1048576
-[  987.503461] udmabuf udmabuf-rx: dma coherent   = 0
-[  987.508250] udmabuf amba:udmabuf-rx: driver installed.
+[ 4810.664289] fpga_manager fpga0: writing loopback-dma.bin to Xilinx Zynq FPGA Manager
+[ 4810.739042] OF: overlay: WARNING: memory leak will occur if overlay removed, property: /amba/fpga-region0/firmware-name
+[ 4810.752987] fclkcfg amba:fclk0: driver installed.
+[ 4810.760961] fclkcfg amba:fclk0: device name    : amba:fclk0
+[ 4810.766621] fclkcfg amba:fclk0: clock  name    : fclk0
+[ 4810.771770] fclkcfg amba:fclk0: clock  rate    : 99999999
+[ 4810.777274] fclkcfg amba:fclk0: clock  enabled : 1
+[ 4810.785038] uio_pdrv_genirq 40400000.loopback_dma: IRQ index 0 not found
+[ 4810.808665] u-dma-buf udmabuf-tx: driver version = 3.0.1
+[ 4810.814069] u-dma-buf udmabuf-tx: major number   = 244
+[ 4810.819204] u-dma-buf udmabuf-tx: minor number   = 0
+[ 4810.824735] u-dma-buf udmabuf-tx: phys address   = 0x30100000
+[ 4810.830480] u-dma-buf udmabuf-tx: buffer size    = 1048576
+[ 4810.836454] u-dma-buf udmabuf-tx: dma device     = amba:udmabuf-tx
+[ 4810.842632] u-dma-buf udmabuf-tx: dma coherent   = 1
+[ 4810.847682] u-dma-buf amba:udmabuf-tx: driver installed.
+[ 4810.861219] u-dma-buf udmabuf-rx: driver version = 3.0.1
+[ 4810.866576] u-dma-buf udmabuf-rx: major number   = 244
+[ 4810.871709] u-dma-buf udmabuf-rx: minor number   = 1
+[ 4810.876722] u-dma-buf udmabuf-rx: phys address   = 0x30200000
+[ 4810.882463] u-dma-buf udmabuf-rx: buffer size    = 1048576
+[ 4810.887998] u-dma-buf udmabuf-rx: dma device     = amba:udmabuf-rx
+[ 4810.894216] u-dma-buf udmabuf-rx: dma coherent   = 1
+[ 4810.899173] u-dma-buf amba:udmabuf-rx: driver installed.
 ```
 
 ## Run loopback-dma-test

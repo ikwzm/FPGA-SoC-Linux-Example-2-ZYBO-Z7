@@ -2,69 +2,85 @@
 CC                     = "gcc"
 CFLAGS                 = ""
 FPGA_BITSTREAM_FILE    = "loopback-dma.bin"
-DEVICE_TREE_DIRECTORY  = "loopback-dma"
+DEVICE_TREE_NAME       = "loopback-dma"
 DEVICE_TREE_FILE       = "loopback-dma.dts"
-UIO_DEVICE_NAME        = "uio0"
-UDMABUF_TX_DEVICE_NAME = "udmabuf-tx"
-UDMABUF_RX_DEVICE_NAME = "udmabuf-rx"
+DEVICE_TREE_DIRECTORY  = "/config/device-tree/overlays/#{DEVICE_TREE_NAME}"
+UIO_DEVICE_NAMES       = ["loopback_dma"]
+UDMABUF_DEVICE_NAMES   = ["udmabuf-tx", "udmabuf-rx"]
+
+def find_uio_device(name)
+  found_device_name = nil
+  Dir::entries("/sys/class/uio").map{ |device_name|
+    if device_name =~ /^uio/
+      File.open("/sys/class/uio/#{device_name}/name"){|file|
+        if name.eql?(file.gets.chop)
+          found_device_name = device_name
+        end
+      }
+    end
+  }
+  return found_device_name
+end
 
 desc "Install fpga and devicetrees"
 task :install => ["/lib/firmware/#{FPGA_BITSTREAM_FILE}", DEVICE_TREE_FILE] do
   begin
-    sh "dtbocfg.rb --install #{DEVICE_TREE_DIRECTORY} --dts #{DEVICE_TREE_FILE}"
+    sh "dtbocfg.rb --install #{DEVICE_TREE_NAME} --dts #{DEVICE_TREE_FILE}"
   rescue => e
     print "error raised:"
     p e
     abort
   end
-  device_file = "/dev/" + UIO_DEVICE_NAME
-  if (File.exist?(device_file) == false)
-    abort "can not #{device_file} installed."
+  if (Dir.exist?(DEVICE_TREE_DIRECTORY) == false)
+    abort "can not #{DEVICE_TREE_DIRECTORY} installed."
   end
-  File::chmod(0666, device_file)
-  if (File.exist?("/dev/" + UDMABUF_TX_DEVICE_NAME) == false)
-    abort "can not udmabuf installed."
+
+  UIO_DEVICE_NAMES.each do |device_name|
+    device_file = find_uio_device(device_name)
+    if (device_file.nil?)
+      abort "can not find uio device file named #{device_name}"
+    end
+    if (File.exist?("/dev/" + device_file) == false)
+      abort "can not /dev/#{device_file} installed."
+    end
+    File::chmod(0666, "/dev/" + device_file)
+  end    
+
+  UDMABUF_DEVICE_NAMES.each do |device_file|
+    device_file_name = File.join("/", "dev", device_file)
+    if (File.exist?(device_file_name) == false)
+      abort "can not found #{device_file_name}"
+    end
+    File::chmod(0666, device_file_name)
+    ["udmabuf", "u-dma-buf"].each do |class_name|
+      sys_class_path = File.join("/", "sys", "class", class_name, device_file)
+      if (File.exist?(sys_class_path) == true) then
+        File::chmod(0666, File.join(sys_class_path, "sync_mode"      ))
+        File::chmod(0666, File.join(sys_class_path, "sync_offset"    ))
+        File::chmod(0666, File.join(sys_class_path, "sync_size"      ))
+        File::chmod(0666, File.join(sys_class_path, "sync_direction" ))
+        File::chmod(0666, File.join(sys_class_path, "sync_owner"     ))
+        File::chmod(0666, File.join(sys_class_path, "sync_for_cpu"   ))
+        File::chmod(0666, File.join(sys_class_path, "sync_for_device"))
+      end
+    end
   end
-  File::chmod(0666, "/dev/" + UDMABUF_TX_DEVICE_NAME)
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_TX_DEVICE_NAME + "/sync_mode")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_TX_DEVICE_NAME + "/sync_offset")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_TX_DEVICE_NAME + "/sync_size")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_TX_DEVICE_NAME + "/sync_direction")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_TX_DEVICE_NAME + "/sync_owner")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_TX_DEVICE_NAME + "/sync_for_cpu")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_TX_DEVICE_NAME + "/sync_for_device")
-  if (File.exist?("/dev/" + UDMABUF_RX_DEVICE_NAME) == false)
-    abort "can not udmabuf installed."
-  end
-  File::chmod(0666, "/dev/" + UDMABUF_RX_DEVICE_NAME)
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_RX_DEVICE_NAME + "/sync_mode")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_RX_DEVICE_NAME + "/sync_offset")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_RX_DEVICE_NAME + "/sync_size")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_RX_DEVICE_NAME + "/sync_direction")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_RX_DEVICE_NAME + "/sync_owner")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_RX_DEVICE_NAME + "/sync_for_cpu")
-  File::chmod(0666, "/sys/class/udmabuf/" + UDMABUF_RX_DEVICE_NAME + "/sync_for_device")
 end
 
 desc "Uninstall fpga and devicetrees"
 task :uninstall do
-  device_file = "/dev/" + UIO_DEVICE_NAME
-  if (File.exist?(device_file) == false)
-    abort "can not #{device_file} uninstalled: does not already exists."
+  if (Dir.exist?(DEVICE_TREE_DIRECTORY) == false)
+    abort "can not #{DEVICE_TREE_DIRECTORY} uninstalled: does not already exists."
   end
-  sh "dtbocfg.rb --remove #{DEVICE_TREE_DIRECTORY}"
+  sh "dtbocfg.rb --remove #{DEVICE_TREE_NAME}"
 end
 
 file "/lib/firmware/#{FPGA_BITSTREAM_FILE}" => ["#{FPGA_BITSTREAM_FILE}"] do
   sh "cp #{FPGA_BITSTREAM_FILE} /lib/firmware/#{FPGA_BITSTREAM_FILE}"
 end
 
-file "/dev/#{UIO_DEVICE_NAME}" do
-  Rake::Task["install"].invoke
-end
-
 file "loopback-dma-test" => ["loopback-dma-test.c"] do
   sh "#{CC} #{CFLAGS} -o loopback-dma-test loopback-dma-test.c"
 end
   
-task :default => ["/dev/#{UIO_DEVICE_NAME}", "loopback-dma-test"]
+task :default => ["loopback-dma-test"]
