@@ -3,6 +3,9 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <dirent.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -18,32 +21,13 @@
 #define S2MM_DESTINATION_ADDRESS 0x48
 #define S2MM_LENGTH 0x58
 
+
 unsigned int dma_set(unsigned int* dma_virtual_address, int offset, unsigned int value) {
     dma_virtual_address[offset>>2] = value;
 }
 
 unsigned int dma_get(unsigned int* dma_virtual_address, int offset) {
     return dma_virtual_address[offset>>2];
-}
-
-int dma_mm2s_sync(unsigned int* dma_virtual_address) {
-    unsigned int mm2s_status =  dma_get(dma_virtual_address, MM2S_STATUS_REGISTER);
-    while(!(mm2s_status & 1<<12) || !(mm2s_status & 1<<1) ){
-        dma_s2mm_status(dma_virtual_address);
-        dma_mm2s_status(dma_virtual_address);
-
-        mm2s_status =  dma_get(dma_virtual_address, MM2S_STATUS_REGISTER);
-    }
-}
-
-int dma_s2mm_sync(unsigned int* dma_virtual_address) {
-    unsigned int s2mm_status = dma_get(dma_virtual_address, S2MM_STATUS_REGISTER);
-    while(!(s2mm_status & 1<<12) || !(s2mm_status & 1<<1)){
-        dma_s2mm_status(dma_virtual_address);
-        dma_mm2s_status(dma_virtual_address);
-
-        s2mm_status = dma_get(dma_virtual_address, S2MM_STATUS_REGISTER);
-    }
 }
 
 void dma_s2mm_status(unsigned int* dma_virtual_address) {
@@ -82,6 +66,26 @@ void dma_mm2s_status(unsigned int* dma_virtual_address) {
     printf("\n");
 }
 
+int dma_mm2s_sync(unsigned int* dma_virtual_address) {
+    unsigned int mm2s_status =  dma_get(dma_virtual_address, MM2S_STATUS_REGISTER);
+    while(!(mm2s_status & 1<<12) || !(mm2s_status & 1<<1) ){
+        dma_s2mm_status(dma_virtual_address);
+        dma_mm2s_status(dma_virtual_address);
+
+        mm2s_status =  dma_get(dma_virtual_address, MM2S_STATUS_REGISTER);
+    }
+}
+
+int dma_s2mm_sync(unsigned int* dma_virtual_address) {
+    unsigned int s2mm_status = dma_get(dma_virtual_address, S2MM_STATUS_REGISTER);
+    while(!(s2mm_status & 1<<12) || !(s2mm_status & 1<<1)){
+        dma_s2mm_status(dma_virtual_address);
+        dma_mm2s_status(dma_virtual_address);
+
+        s2mm_status = dma_get(dma_virtual_address, S2MM_STATUS_REGISTER);
+    }
+}
+
 void memdump(void* virtual_address, int byte_count) {
     char *p = virtual_address;
     int offset;
@@ -94,6 +98,7 @@ void memdump(void* virtual_address, int byte_count) {
 
 struct udmabuf {
     char           name[128];
+    char           sys_class_path[1024];
     int            file;
     unsigned char* buf;
     unsigned int   buf_size;
@@ -105,6 +110,7 @@ struct udmabuf {
 
 int udmabuf_open(struct udmabuf* udmabuf, const char* name, int cache_on)
 {
+    char*          sys_class_path_list[] = {"/sys/class/u-dma-buf", "/sys/class/udmabuf"};
     char           file_name[1024];
     int            fd;
     unsigned char  attr[1024];
@@ -113,7 +119,26 @@ int udmabuf_open(struct udmabuf* udmabuf, const char* name, int cache_on)
     udmabuf->file = -1;
     udmabuf->cache_on = cache_on;
 
-    sprintf(file_name, "/sys/class/udmabuf/%s/phys_addr", name);
+    {
+        int i;
+        int found = 0;
+        for (i = 0; i < sizeof(sys_class_path_list); i++) {
+            DIR*   dp;
+            sprintf(file_name, "%s/%s", sys_class_path_list[i], name);
+            dp = opendir(file_name);
+            if (dp != NULL) {
+                strncpy(udmabuf->sys_class_path, file_name, 1024);
+                found = 1;
+                break;
+            }
+        }
+        if (found == 0) {
+            printf("Can not found sys class\n");
+            return (-1);
+        }
+    }
+
+    sprintf(file_name, "%s/phys_addr", udmabuf->sys_class_path);
     if ((fd  = open(file_name, O_RDONLY)) == -1) {
         printf("Can not open %s\n", file_name);
         return (-1);
@@ -122,7 +147,7 @@ int udmabuf_open(struct udmabuf* udmabuf, const char* name, int cache_on)
     sscanf(attr, "%lx", &udmabuf->phys_addr);
     close(fd);
 
-    sprintf(file_name, "/sys/class/udmabuf/%s/size", name);
+    sprintf(file_name, "%s/size", udmabuf->sys_class_path);
     if ((fd  = open(file_name, O_RDONLY)) == -1) {
         printf("Can not open %s\n", file_name);
         return (-1);
@@ -160,7 +185,7 @@ int udmabuf_sync_area(struct udmabuf* udmabuf, unsigned int offset, unsigned int
     int            fd;
     unsigned char  attr[1024];
 
-    sprintf(file_name, "/sys/class/udmabuf/%s/sync_offset", udmabuf->name);
+    sprintf(file_name, "%s/sync_offset", udmabuf->sys_class_path);
     if ((fd  = open(file_name, O_RDWR)) == -1) {
         printf("Can not open %s\n", file_name);
         return (-1);
@@ -168,7 +193,7 @@ int udmabuf_sync_area(struct udmabuf* udmabuf, unsigned int offset, unsigned int
     sprintf(attr, "%d", offset);
     write(fd, (void*)attr, strlen(attr));
     close(fd);
-    sprintf(file_name, "/sys/class/udmabuf/%s/sync_size", udmabuf->name);
+    sprintf(file_name, "%s/sync_size", udmabuf->sys_class_path);
     if ((fd  = open(file_name, O_RDWR)) == -1) {
         printf("Can not open %s\n", file_name);
         return (-1);
@@ -176,7 +201,7 @@ int udmabuf_sync_area(struct udmabuf* udmabuf, unsigned int offset, unsigned int
     sprintf(attr, "%d", size);
     write(fd, (void*)attr, strlen(attr));
     close(fd);
-    sprintf(file_name, "/sys/class/udmabuf/%s/sync_direction", udmabuf->name);
+    sprintf(file_name, "%s/sync_direction", udmabuf->sys_class_path);
     if ((fd  = open(file_name, O_RDWR)) == -1) {
         printf("Can not open %s\n", file_name);
         return (-1);
@@ -193,7 +218,7 @@ int udmabuf_sync_for_device(struct udmabuf* udmabuf)
     int            fd;
     unsigned char  attr[1024];
 
-    sprintf(file_name, "/sys/class/udmabuf/%s/sync_for_device", udmabuf->name);
+    sprintf(file_name, "%s/sync_for_device", udmabuf->sys_class_path);
     if ((fd  = open(file_name, O_RDWR)) == -1) {
         printf("Can not open %s\n", file_name);
         return (-1);
@@ -210,7 +235,7 @@ int udmabuf_sync_for_cpu(struct udmabuf* udmabuf)
     int            fd;
     unsigned char  attr[1024];
 
-    sprintf(file_name, "/sys/class/udmabuf/%s/sync_for_cpu", udmabuf->name);
+    sprintf(file_name, "%s/sync_for_cpu", udmabuf->sys_class_path);
     if ((fd  = open(file_name, O_RDWR)) == -1) {
         printf("Can not open %s\n", file_name);
         return (-1);
@@ -219,6 +244,46 @@ int udmabuf_sync_for_cpu(struct udmabuf* udmabuf)
     write(fd, (void*)attr, strlen(attr));
     close(fd);
     return 0;
+}
+
+int uio_open(char* name)
+{
+    DIR*   dp;
+    char   temp_buf[1024];
+    dp = opendir("/sys/class/uio/");
+    if (dp != NULL) {
+        struct dirent* entry;
+        do {
+            entry = readdir(dp);
+            if (entry != NULL) {
+                FILE*   fd;
+                sprintf(temp_buf, "/sys/class/uio/%s/name", entry->d_name);
+                // printf("scan %s\n", temp_buf);
+                if ((fd = fopen(temp_buf, "r")) != NULL) {
+                    int     found = 0;
+                    int     i;
+                    if (fgets(temp_buf, sizeof(temp_buf), fd) != NULL) {
+                        // printf("read => %s\n", temp_buf);
+                        for(i = 0; i < sizeof(temp_buf); i++) {
+                            if ((name[i] == '\0') && ((temp_buf[i] == '\0' || temp_buf[i] == '\n'))) {
+                                found = 1;
+                                break;
+                            }
+                            if (name[i] != temp_buf[i]) 
+                                break;
+                        }
+                    }
+                    fclose(fd);
+                    if (found == 1) {
+                        sprintf(temp_buf, "/dev/%s", entry->d_name);
+                        // printf("found %s in %s\n", name, temp_buf);
+                        return open(temp_buf, O_RDWR);
+                    }
+                }
+            }
+        } while(entry != NULL);
+    }
+    return -1;
 }
 
 int main() {
@@ -231,8 +296,8 @@ int main() {
     unsigned int   test_size = 32;
     int            buf_cache_on = 1;
 
-    if ((uio_fd = open("/dev/uio0", O_RDWR)) == -1) {
-        printf("Can not open /dev/uio0\n");
+    if ((uio_fd = uio_open("loopback_dma")) == -1) {
+        printf("Can not open loopback_dma uio\n");
         exit(1);
     }
     virtual_address = (unsigned int*)mmap(NULL, 65535, PROT_READ|PROT_WRITE, MAP_SHARED, uio_fd, 0);
