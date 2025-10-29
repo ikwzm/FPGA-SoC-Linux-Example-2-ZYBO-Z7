@@ -8,7 +8,10 @@ FPGA-SoC-Linux example(2) binary and project and test code for ZYBO-Z7
 ### Requirement
 
 * Board: ZYBO-Z7
-* OS: [FPGA-SoC-Linux](https://github.com/ikwzm/FPGA-SoC-Linux.git)
+* OS:
+  + ~~[FPGA-SoC-Linux](https://github.com/ikwzm/FPGA-SoC-Linux.git)~~
+  + [FPGA-SoC-Debian12](https://github.com/ikwzm/FPGA-SoC-Debian12.git)
+  + [FPGA-SoC-Debian13](https://github.com/ikwzm/FPGA-SoC-Debian13.git)
 
 ### Reference
 
